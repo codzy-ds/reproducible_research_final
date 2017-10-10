@@ -1,0 +1,30 @@
+---
+title: "Storm Analysis"
+author: "Michel Bernier"
+date: "October 10, 2017"
+output: html_document
+---
+## Introduction
+This document will analyse the storm event database from the National weather services. This analysis will try to answer two question : 
+
+1- Which types of events, inside the united states are the most harmful with respect to population health.
+2- Inside the United States, which types of events have the geatest economic consequences.
+
+## Data Processing
+```{r echo=TRUE}
+if(!dir.exists("data")) {
+  dir.create("data")
+  download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "data/dataset.csv.bz2")
+}
+data <- read.csv2("data/dataset.csv.bz2", sep = ",")
+```
+
+## Results
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
