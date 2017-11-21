@@ -12,6 +12,8 @@ This document will analyse the storm event database from the National weather se
 2- Inside the United States, which types of events have the geatest economic consequences.
 
 ## Data Processing
+
+First Download and read the dataset.
 ```{r echo=TRUE, cache=TRUE}
 if(!dir.exists("data")) {
   dir.create("data")
@@ -20,6 +22,7 @@ if(!dir.exists("data")) {
 data <- read.csv2("data/dataset.csv.bz2", sep = ",")
 ```
 
+Then, since not all year have enough data to be significant, we will eliminate the rows that have under the mean per year. (Normally would not be significant, but good enough for the dataset).
 ```{r echo=TRUE}
 library(dplyr)
 
@@ -28,25 +31,27 @@ data$year <- as.numeric(format(as.Date(data$BGN_DATE, format = "%m/%d/%Y %H:%M:%
 findBreakingPoint <- data[c("year")]
 findBreakingPoint <- findBreakingPoint %>%
   group_by(year) %>%
-  mutate(count = n())
+  summarise(count = n())
 
 minyear <- min(findBreakingPoint[findBreakingPoint$count > mean(findBreakingPoint$count),]$year)
 
 data <- subset(data, minyear <= year)
 ```
 
-Than filter by variables
+Than filter by variables and transform quantity of damage in dollars with the indice (k,m,b).
 ```{r echo=TRUE}
-  finvars <- names(data) %in% c("BGN_DATE", "EVTYPE", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
+  finvars <- names(data) %in% c("year", "EVTYPE", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
   financial_data <- data[finvars]
+  financial_data$CROPDMG <- as.numeric(financial_data$CROPDMG)
+  financial_data$PROPDMG <- as.numeric(financial_data$PROPDMG)
   financial_data <- transform(financial_data, PROPDMG = ifelse(tolower(PROPDMGEXP) == "k", PROPDMG * 1e3, 
                                                                ifelse(tolower(PROPDMGEXP) == "m", PROPDMG * 1e6, 
                                                                       ifelse(tolower(PROPDMGEXP) == "b", PROPDMG * 1e9, PROPDMG))))
   financial_data <- transform(financial_data, CROPDMG = ifelse(tolower(CROPDMGEXP) == "k", CROPDMG * 1e3, 
                                                                ifelse(tolower(CROPDMGEXP) == "m", CROPDMG * 1e6, 
                                                                       ifelse(tolower(CROPDMGEXP) == "b", CROPDMG * 1e9, CROPDMG))))
-#  financial_data <- aggregate(data=financial_data, PROPDMG+CROPDMG~EVTYPE+BGN_DATE, FUN=sum, na.action = na.omit)
-#  financial_data <- aggregate(data=financial_data, PROPDMG+CROPDMG~EVTYPE, FUN=mean, na.action = na.omit)
+financial_data <- aggregate(data=financial_data, PROPDMG+CROPDMG~EVTYPE+BGN_DATE, FUN=sum, na.action = na.omit)
+financial_data <- aggregate(data=financial_data, PROPDMG+CROPDMG~EVTYPE, FUN=mean, na.action = na.omit)
 ```
 
 ## Results
