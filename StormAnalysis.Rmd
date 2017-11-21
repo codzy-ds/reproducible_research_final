@@ -22,7 +22,7 @@ if(!dir.exists("data")) {
 data <- read.csv2("data/dataset.csv.bz2", sep = ",")
 ```
 
-Then, since not all year have enough data to be significant, we will eliminate the rows that have under the mean per year. (Normally would not be significant, but good enough for the dataset).
+Since not all year have enough data to be significant, we will eliminate the rows that have under the mean per year. (Normally would not be significant, but good enough for the dataset).
 ```{r echo=TRUE}
 library(dplyr)
 
@@ -36,22 +36,46 @@ findBreakingPoint <- findBreakingPoint %>%
 minyear <- min(findBreakingPoint[findBreakingPoint$count > mean(findBreakingPoint$count),]$year)
 
 data <- subset(data, minyear <= year)
+
 ```
 
+### 2- Economic consequences
 Than filter by variables and transform quantity of damage in dollars with the indice (k,m,b).
 ```{r echo=TRUE}
-  finvars <- names(data) %in% c("year", "EVTYPE", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
-  financial_data <- data[finvars]
-  financial_data$CROPDMG <- as.numeric(financial_data$CROPDMG)
-  financial_data$PROPDMG <- as.numeric(financial_data$PROPDMG)
-  financial_data <- transform(financial_data, PROPDMG = ifelse(tolower(PROPDMGEXP) == "k", PROPDMG * 1e3, 
-                                                               ifelse(tolower(PROPDMGEXP) == "m", PROPDMG * 1e6, 
-                                                                      ifelse(tolower(PROPDMGEXP) == "b", PROPDMG * 1e9, PROPDMG))))
-  financial_data <- transform(financial_data, CROPDMG = ifelse(tolower(CROPDMGEXP) == "k", CROPDMG * 1e3, 
-                                                               ifelse(tolower(CROPDMGEXP) == "m", CROPDMG * 1e6, 
-                                                                      ifelse(tolower(CROPDMGEXP) == "b", CROPDMG * 1e9, CROPDMG))))
-financial_data <- aggregate(data=financial_data, PROPDMG+CROPDMG~EVTYPE+BGN_DATE, FUN=sum, na.action = na.omit)
-financial_data <- aggregate(data=financial_data, PROPDMG+CROPDMG~EVTYPE, FUN=mean, na.action = na.omit)
+finvars <- names(data) %in% c("year", "EVTYPE", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
+financial_data <- data[finvars]
+financial_data$CROPDMG <- as.numeric(as.character(financial_data$CROPDMG))
+financial_data$PROPDMG <- as.numeric(as.character(financial_data$PROPDMG))
+financial_data <- transform(financial_data, PROPDMG = ifelse(tolower(PROPDMGEXP) == "k", PROPDMG * 1e3, 
+                                                             ifelse(tolower(PROPDMGEXP) == "m", PROPDMG * 1e6, 
+                                                                    ifelse(tolower(PROPDMGEXP) == "b", PROPDMG * 1e9, PROPDMG))))
+financial_data <- transform(financial_data, CROPDMG = ifelse(tolower(CROPDMGEXP) == "k", CROPDMG * 1e3, 
+                                                             ifelse(tolower(CROPDMGEXP) == "m", CROPDMG * 1e6, 
+                                                                    ifelse(tolower(CROPDMGEXP) == "b", CROPDMG * 1e9, CROPDMG))))
+
+```
+
+Filter sum the data per event type and year. and get the 6 events that have the most economic consequence.
+```{r echo=TRUE}
+financial_data <- financial_data %>%
+  group_by(year, EVTYPE) %>%
+  summarise(totalcropdmg=sum(CROPDMG), totalpropdmg=sum(PROPDMG))
+  
+financial_data <- financial_data %>%
+  group_by(EVTYPE) %>%
+  summarise(totalcropdmg=sum(totalcropdmg), totalpropdmg=sum(totalpropdmg)) %>%
+  mutate(totaldmg=totalcropdmg+totalpropdmg) %>%
+  top_n(n = 6, wt=totaldmg)
+
+```
+
+Plot a graphic of the economic consequences.
+```{r echot=TRUE}
+library(ggplot2)
+financial_plot <- ggplot(financial_data, aes(EVTYPE))
+financial_plot +  geom_bar(aes(y=totalpropdmg), color="darkgreen", fill="green", alpha=0.4, stat="identity") + 
+  geom_bar(aes(y = totalcropdmg), colour = "darkred", fill="red", alpha=0.4, stat = "identity") +
+  ggtitle("6 top most financial eavy events") + ylab("dommage in dollars") + xlab("Events")
 ```
 
 ## Results

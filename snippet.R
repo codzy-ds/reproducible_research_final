@@ -2,6 +2,7 @@
 # Script to dabble with data exploration before playoing with knitr.
 ########################################################################
 library(dplyr)
+library(ggplot2)
 
 if(!dir.exists("data")) {
   dir.create("data")
@@ -42,5 +43,12 @@ financial_data <- financial_data %>%
   
 financial_data <- financial_data %>%
   group_by(EVTYPE) %>%
-  summarise(meancropperyear=sum(totalcropdmg), meanpropperyear=sum(totalpropdmg)) %>%
-  order_by(meanpropperyear)
+  summarise(totalcropdmg=sum(totalcropdmg), totalpropdmg=sum(totalpropdmg)) %>%
+  mutate(totaldmg=totalcropdmg+totalpropdmg) %>%
+  top_n(n = 6, wt=totaldmg)
+
+financial_plot <- ggplot(financial_data, aes(EVTYPE))
+financial_plot +  geom_bar(aes(y=totalpropdmg), color="darkgreen", fill="green", alpha=0.4, stat="identity") + 
+  geom_bar(aes(y = totalcropdmg), colour = "darkred", fill="red", alpha=0.4, stat = "identity") +
+  ggtitle("6 top most financial eavy events") + ylab("dommage in dollars") + xlab("Events")
+
