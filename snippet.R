@@ -3,11 +3,12 @@
 ########################################################################
 library(dplyr)
 library(ggplot2)
+library(tidyr)
 
 if(!dir.exists("data")) {
   dir.create("data")
   download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "data/dataset.csv.bz2")
-}
+} 
 
 if(!exists("data_init")) {
   data_init <- read.csv2("data/dataset.csv.bz2", sep = ",")
@@ -46,6 +47,10 @@ financial_data <- financial_data %>%
   summarise(totalcropdmg=sum(totalcropdmg), totalpropdmg=sum(totalpropdmg)) %>%
   mutate(totaldmg=totalcropdmg+totalpropdmg) %>%
   top_n(n = 6, wt=totaldmg)
+
+library(tidyr)
+financial_data <- financial_data %>%
+  gather("DMGTYPE", "DMGVALUE", c("totalpropdmg","totalcropdmg"))
 
 financial_plot <- ggplot(financial_data, aes(EVTYPE))
 financial_plot +  geom_bar(aes(y=totalpropdmg), color="darkgreen", fill="green", alpha=0.4, stat="identity") + 

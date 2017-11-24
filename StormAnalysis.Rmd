@@ -13,6 +13,12 @@ This document will analyse the storm event database from the National weather se
 
 ## Data Processing
 
+```{r echo=TRUE}
+library(knitr)
+library(ggplot2)
+library(tidyr)
+```
+
 First Download and read the dataset.
 ```{r echo=TRUE, cache=TRUE}
 if(!dir.exists("data")) {
@@ -23,7 +29,7 @@ data <- read.csv2("data/dataset.csv.bz2", sep = ",")
 ```
 
 Since not all year have enough data to be significant, we will eliminate the rows that have under the mean per year. (Normally would not be significant, but good enough for the dataset).
-```{r echo=TRUE}
+```{r echo=TRUE,message=FALSE, warning=FALSE}
 library(dplyr)
 
 data$year <- as.numeric(format(as.Date(data$BGN_DATE, format = "%m/%d/%Y %H:%M:%S"), "%Y"))
@@ -39,11 +45,94 @@ data <- subset(data, minyear <= year)
 
 ```
 
+## Count events
+```{r echo=TRUE}
+eventType_count <- data[c("EVTYPE")]
+eventType_count$EVTYPE <- as.character(eventType_count$EVTYPE)
+eventType_count <- eventType_count %>%
+  group_by(EVTYPE) %>%
+  summarise(count=n()) %>%
+  top_n(n = 20, wt=count)
+```
+
+### 1- Health consequences
+
+```{r echo=TRUE}
+health_data <- data[c("year", "EVTYPE", "INJURIES", "FATALITIES")]
+health_data$INJURIES <- as.numeric(as.character(health_data$INJURIES))
+health_data$FATALITIES <- as.numeric(as.character(health_data$FATALITIES))
+```
+
+```{r echo=TRUE}
+health_data_abs <- health_data %>%
+  group_by(EVTYPE) %>%
+  summarise(totalinjuries=sum(INJURIES), totalfatalities=sum(FATALITIES)) %>%
+  mutate(total_health_consequences=totalinjuries + totalfatalities)
+
+health_data_rel <- health_data %>%
+  group_by(EVTYPE) %>%
+  summarise(meaninjuries=mean(INJURIES), meanfatalities=mean(FATALITIES)) %>%
+  mutate(relative_health_consequences=meaninjuries + meanfatalities)
+```
+
+```{r echo=TRUE}
+health_data_abs_injuries <- health_data_abs %>%
+  top_n(n =10, wt=totalinjuries)
+kable(health_data_abs_injuries[, c("EVTYPE", "totalinjuries")], 
+      caption = "10 events that caused the most injuries from 1995 to 2007", 
+      col.names = c("EVENTS TYPE", "ABSOLUTE NUMBER OF INJURIES"))
+
+health_data_abs_fatalities <- health_data_abs %>%
+  top_n(n =10, wt=totalfatalities)
+kable(health_data_abs_fatalities[, c("EVTYPE", "totalfatalities")], 
+      caption = "10 events that caused the most fatalities from 1995 to 2007", 
+      col.names = c("EVENTS TYPE", "ABSOLUTE NUMBER OF FATALITIES"))
+
+health_data_abs_total <- health_data_abs %>%
+  top_n(n =10, wt=total_health_consequences)
+kable(health_data_abs_total[, c("EVTYPE", "total_health_consequences")], 
+      caption = "10 events that caused the most injuries from 1995 to 2007", 
+      col.names = c("EVENTS TYPE", "ABSOLUTE HEALTH CONSEQUENCES (FATALITIES + INJURIES)"))
+```
+
+```{r echo=TRUE}
+health_data_rel_injuries <- health_data_rel %>%
+  top_n(n =10, wt=meaninjuries)
+kable(health_data_rel_injuries[, c("EVTYPE", "meaninjuries")], 
+      digits = 2,
+      caption = "10 events that caused the most injuries from 1995 to 2007", 
+      col.names = c("EVENTS TYPE", "RELATIVE NUMBER OF INJURIES"))
+
+health_data_rel_fatalities <- health_data_rel %>%
+  top_n(n =10, wt=meanfatalities)
+kable(health_data_rel_fatalities[, c("EVTYPE", "meanfatalities")], 
+      digits = 2,
+      caption = "10 events that caused the most fatalities from 1995 to 2007", 
+      col.names = c("EVENTS TYPE", "RELATIVE NUMBER OF FATALITIES"))
+
+health_data_rel_total <- health_data_rel %>%
+  top_n(n =10, wt=relative_health_consequences)
+kable(health_data_rel_total[, c("EVTYPE", "relative_health_consequences")], 
+      digits = 2,
+      caption = "10 events that caused the most injuries from 1995 to 2007", 
+      col.names = c("EVENTS TYPE", "RELATIVE HEALTH CONSEQUENCES (FATALITIES + INJURIES)"))
+```
+
+```{r echo=TRUE}
+health_data <- health_data_abs_total %>%
+  gather("CONSEQUENCE_TYPE", "VALUE", c("totalinjuries","totalfatalities"))
+```
+
+```{r echo=TRUE}
+financial_plot <- ggplot(health_data, aes(EVTYPE, y=VALUE, fill=CONSEQUENCE_TYPE))
+financial_plot +  geom_bar(stat = "identity") + 
+  ggtitle("10 top most events in relation to health") + ylab("number of occurences") + xlab("Events")
+```
+
 ### 2- Economic consequences
 Than filter by variables and transform quantity of damage in dollars with the indice (k,m,b).
 ```{r echo=TRUE}
-finvars <- names(data) %in% c("year", "EVTYPE", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
-financial_data <- data[finvars]
+financial_data <- data[c("year", "EVTYPE", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
 financial_data$CROPDMG <- as.numeric(as.character(financial_data$CROPDMG))
 financial_data$PROPDMG <- as.numeric(as.character(financial_data$PROPDMG))
 financial_data <- transform(financial_data, PROPDMG = ifelse(tolower(PROPDMGEXP) == "k", PROPDMG * 1e3, 
@@ -57,24 +146,55 @@ financial_data <- transform(financial_data, CROPDMG = ifelse(tolower(CROPDMGEXP)
 
 Filter sum the data per event type and year. and get the 6 events that have the most economic consequence.
 ```{r echo=TRUE}
-financial_data <- financial_data %>%
-  group_by(year, EVTYPE) %>%
-  summarise(totalcropdmg=sum(CROPDMG), totalpropdmg=sum(PROPDMG))
-  
-financial_data <- financial_data %>%
+financial_data_abs <- financial_data %>%
   group_by(EVTYPE) %>%
-  summarise(totalcropdmg=sum(totalcropdmg), totalpropdmg=sum(totalpropdmg)) %>%
-  mutate(totaldmg=totalcropdmg+totalpropdmg) %>%
-  top_n(n = 6, wt=totaldmg)
+  summarise(totalcropdmg=sum(CROPDMG), totalpropdmg=sum(PROPDMG)) %>%
+  mutate(totaldmg=totalcropdmg+totalpropdmg)
 
+financial_data_rel <- financial_data %>%
+  group_by(EVTYPE) %>%
+  summarise(meancropdmg=mean(CROPDMG), meanpropdmg=mean(PROPDMG)) %>%
+  mutate(totaldmg=meancropdmg+meanpropdmg)
+```
+
+```{r echo=TRUE}
+financial_data_abs_prop <- financial_data_abs %>%
+  top_n(n =10, wt=totalpropdmg)
+kable(financial_data_abs_prop[, c("EVTYPE", "totalpropdmg")], caption = "10 events that causes the most propety damage from 1995 to 2007", col.names = c("EVENTS TYPE", "ABSOLUTE PROPERTY DAMAGES"))
+
+financial_data_abs_crop <- financial_data_abs %>%
+  top_n(n =10, wt=totalcropdmg)
+kable(financial_data_abs_prop[, c("EVTYPE", "totalcropdmg")], caption = "10 events that causes the most crop damage from 1995 to 2007",col.names = c("EVENTS TYPE", "ABSOLUTE CROP DAMAGES"))
+
+financial_data_abs_total <- financial_data_abs %>%
+  top_n(n =10, wt=totaldmg)
+kable(financial_data_abs_prop[, c("EVTYPE", "totaldmg")], caption = "10  for absolute total damage (crop + property) from 1995 to 2007", col.names = c("EVENTS TYPE", "ABSOLUTE TOTAL DAMAGES"))
+```
+
+
+```{r echo=TRUE}
+financial_data_rel_prop <- financial_data_rel %>%
+  top_n(n=10, wt=meanpropdmg)
+kable(financial_data_rel_prop[, c("EVTYPE", "meanpropdmg")], caption = "10 events that causes the most propety damage from 1995 to 2007", col.names = c("EVENTS TYPE", "RELATIVE PROPERTY DAMAGES"))
+
+financial_data_rel_crop <- financial_data_rel %>%
+  top_n(n =10, wt=meancropdmg)
+kable(financial_data_rel_crop[, c("EVTYPE", "meancropdmg")], caption = "10 events that causes the most crop damage from 1995 to 2007",col.names = c("EVENTS TYPE", "RELATIVE CROP DAMAGES"))
+
+financial_data_rel_total <- financial_data_rel %>%
+  top_n(n =10, wt=totaldmg)
+kable(financial_data_rel_total[, c("EVTYPE", "totaldmg")], caption = "10  for absolute total damage (crop + property) from 1995 to 2007", col.names = c("EVENTS TYPE", "RELATIVE TOTAL DAMAGES"))
+```
+
+```{r echo=TRUE}
+financial_data <- financial_data_abs_total %>%
+  gather("DMGTYPE", "DMGVALUE", c("totalpropdmg","totalcropdmg"))
 ```
 
 Plot a graphic of the economic consequences.
-```{r echot=TRUE}
-library(ggplot2)
-financial_plot <- ggplot(financial_data, aes(EVTYPE))
-financial_plot +  geom_bar(aes(y=totalpropdmg), color="darkgreen", fill="green", alpha=0.4, stat="identity") + 
-  geom_bar(aes(y = totalcropdmg), colour = "darkred", fill="red", alpha=0.4, stat = "identity") +
+```{r echot=TRUE, fig.height=500, fig.width=500}
+financial_plot <- ggplot(financial_data, aes(EVTYPE, y=DMGVALUE, fill=DMGTYPE))
+financial_plot +  geom_bar(stat = "identity") + 
   ggtitle("6 top most financial eavy events") + ylab("dommage in dollars") + xlab("Events")
 ```
 
