@@ -190,30 +190,42 @@ Have two dataset, one with absolute data (the sum of fatalites and injuries per 
 ```{r echo=TRUE}
 financial_data_abs_prop <- financial_data_abs %>%
   top_n(n =10, wt=propdmg)
-kable(financial_data_abs_prop[, c("EVTYPE", "propdmg")], caption = "10 events that causes the most propety damage from 1995 to 2011", col.names = c("EVENTS TYPE", "ABSOLUTE PROPERTY DAMAGES"))
+kable(financial_data_abs_prop[, c("EVTYPE", "propdmg")], 
+      caption = "10 events that causes the most propety damage from 1995 to 2011", 
+      col.names = c("EVENTS TYPE", "ABSOLUTE PROPERTY DAMAGES"))
 
 financial_data_abs_crop <- financial_data_abs %>%
   top_n(n =10, wt=cropdmg)
-kable(financial_data_abs_prop[, c("EVTYPE", "cropdmg")], caption = "10 events that causes the most crop damage from 1995 to 2011",col.names = c("EVENTS TYPE", "ABSOLUTE CROP DAMAGES"))
+kable(financial_data_abs_prop[, c("EVTYPE", "cropdmg")], 
+      caption = "10 events that causes the most crop damage from 1995 to 2011",
+      col.names = c("EVENTS TYPE", "ABSOLUTE CROP DAMAGES"))
 
 financial_data_abs_total <- financial_data_abs %>%
   top_n(n =10, wt=totaldmg)
-kable(financial_data_abs_prop[, c("EVTYPE", "totaldmg")], caption = "10  for absolute total damage (crop + property) from 1995 to 2011", col.names = c("EVENTS TYPE", "ABSOLUTE TOTAL DAMAGES"))
+kable(financial_data_abs_prop[, c("EVTYPE", "totaldmg")], 
+      caption = "10  for absolute total damage (crop + property) from 1995 to 2011", 
+      col.names = c("EVENTS TYPE", "ABSOLUTE TOTAL DAMAGES"))
 ```
 
 Again, with the 3 table of crop, property and total damages, but this time, on the sum of damages in the span of 17 years (1994-2011).
 ```{r echo=TRUE}
 financial_data_rel_prop <- financial_data_rel %>%
   top_n(n=10, wt=propdmg)
-kable(financial_data_rel_prop[, c("EVTYPE", "propdmg")], caption = "10 events that causes the most propety damage from 1995 to 2011", col.names = c("EVENTS TYPE", "RELATIVE PROPERTY DAMAGES"))
+kable(financial_data_rel_prop[, c("EVTYPE", "propdmg")], 
+      caption = "10 events that causes the most propety damage from 1995 to 2011", 
+      col.names = c("EVENTS TYPE", "RELATIVE PROPERTY DAMAGES"))
 
 financial_data_rel_crop <- financial_data_rel %>%
   top_n(n =10, wt=cropdmg)
-kable(financial_data_rel_crop[, c("EVTYPE", "cropdmg")], caption = "10 events that causes the most crop damage from 1995 to 2011",col.names = c("EVENTS TYPE", "RELATIVE CROP DAMAGES"))
+kable(financial_data_rel_crop[, c("EVTYPE", "cropdmg")], 
+      caption = "10 events that causes the most crop damage from 1995 to 2011",
+      col.names = c("EVENTS TYPE", "RELATIVE CROP DAMAGES"))
 
 financial_data_rel_total <- financial_data_rel %>%
   top_n(n =10, wt=totaldmg)
-kable(financial_data_rel_total[, c("EVTYPE", "totaldmg")], caption = "10  for absolute total damage (crop + property) from 1995 to 2011", col.names = c("EVENTS TYPE", "RELATIVE TOTAL DAMAGES"))
+kable(financial_data_rel_total[, c("EVTYPE", "totaldmg")], 
+      caption = "10  for absolute total damage (crop + property) from 1995 to 2011", 
+      col.names = c("EVENTS TYPE", "RELATIVE TOTAL DAMAGES"))
 ```
 
 Then, modifying the table to determine discriminate in the graphic crop and property damages, we will plot a bar chart to give us an idea of the distribution of the damages during the span of 17 years.
@@ -243,7 +255,4 @@ financial_plot +  geom_bar(stat = "identity") +
 
 ## Results
 
-You can also embed plots, for example:
 
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
