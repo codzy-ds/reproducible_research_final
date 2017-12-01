@@ -1,25 +1,31 @@
 ---
-title: "Storm Analysis"
+title: "Health and financial analysis of weather events"
 author: "Michel Bernier"
 date: "October 10, 2017"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
-## Introduction
+## Synopsis
 This document will analyse the storm event database from the National weather services. This analysis will try to answer two question : 
 
 1- Which types of events, inside the united states are the most harmful with respect to population health.
 2- Inside the United States, which types of events have the geatest economic consequences.
 
+For both analysis (health and financial), we will need to know the mean of consequences for each events, to know the consequence per individual events and the sum to know the absolute damage of each event accross a significant period of time.
+
 ## Data Processing
 
-```{r echo=TRUE}
+First, load the libraries we will need during the analysis. Loading them at the begining of the document ensure that we don't load them more times than needs be and the we have them available when they are needed.
+```{r echo=TRUE, warning=FALSE}
 library(knitr)
 library(ggplot2)
 library(tidyr)
+library(dplyr)
 ```
 
-First Download and read the dataset.
+Download and read the dataset. if it is not already loaded.
 ```{r echo=TRUE, cache=TRUE}
 if(!dir.exists("data")) {
   dir.create("data")
@@ -28,9 +34,8 @@ if(!dir.exists("data")) {
 data <- read.csv2("data/dataset.csv.bz2", sep = ",")
 ```
 
-Since not all year have enough data to be significant, we will eliminate the rows that have under the mean per year. (Normally would not be significant, but good enough for the dataset).
-```{r echo=TRUE,message=FALSE, warning=FALSE}
-library(dplyr)
+Since not all year have enough data to be significant, we will eliminate the rows that have not enough data, calculating the mean and eliminating everything under that mean value. (Normally would not be significant, but good enough for the dataset).
+```{r echo=TRUE,message=FALSE}
 
 data$year <- as.numeric(format(as.Date(data$BGN_DATE, format = "%m/%d/%Y %H:%M:%S"), "%Y"))
 
@@ -46,6 +51,8 @@ data <- subset(data, minyear <= year)
 ```
 
 ## Count events
+
+get the top 20 events that happened the most often between 1994 and 2011.
 ```{r echo=TRUE}
 eventType_count <- data[c("EVTYPE")]
 eventType_count$EVTYPE <- as.character(eventType_count$EVTYPE)
@@ -53,83 +60,105 @@ eventType_count <- eventType_count %>%
   group_by(EVTYPE) %>%
   summarise(count=n()) %>%
   top_n(n = 20, wt=count)
+
+kable(eventType_count[, c("EVTYPE", "count")], 
+      caption = "20 events that happened most often from 1995 to 2011", 
+      col.names = c("EVENTS TYPE", "ABSOLUTE NUMBER OF FATALITIES"))
 ```
 
 ### 1- Health consequences
 
+Transform INFURIES and FATALITIES to numeric data to be able to calcultate sums and means.
 ```{r echo=TRUE}
 health_data <- data[c("year", "EVTYPE", "INJURIES", "FATALITIES")]
 health_data$INJURIES <- as.numeric(as.character(health_data$INJURIES))
 health_data$FATALITIES <- as.numeric(as.character(health_data$FATALITIES))
 ```
 
+Have two dataset, one with absolute data (the sum of fatalites and injuries per events from 1994 to 2011) and one with the relative data (the fatalities and injuries per individual events from 1994 to 2011) to be able to compare the difference between two vision. 
 ```{r echo=TRUE}
 health_data_abs <- health_data %>%
   group_by(EVTYPE) %>%
-  summarise(totalinjuries=sum(INJURIES), totalfatalities=sum(FATALITIES)) %>%
-  mutate(total_health_consequences=totalinjuries + totalfatalities)
+  summarise(injuries=sum(INJURIES), fatalities=sum(FATALITIES)) %>%
+  mutate(total_health_consequences=injuries + fatalities)
 
 health_data_rel <- health_data %>%
   group_by(EVTYPE) %>%
-  summarise(meaninjuries=mean(INJURIES), meanfatalities=mean(FATALITIES)) %>%
-  mutate(relative_health_consequences=meaninjuries + meanfatalities)
+  summarise(injuries=mean(INJURIES), fatalities=mean(FATALITIES)) %>%
+  mutate(relative_health_consequences=injuries + fatalities)
 ```
 
+By creating 3 table, getting the top 10 events relative to injuries, fatalities and health consequences total, we will be able to determine what event has the most consequences per individual event.
 ```{r echo=TRUE}
 health_data_abs_injuries <- health_data_abs %>%
-  top_n(n =10, wt=totalinjuries)
-kable(health_data_abs_injuries[, c("EVTYPE", "totalinjuries")], 
-      caption = "10 events that caused the most injuries from 1995 to 2007", 
+  top_n(n =10, wt=injuries)
+kable(health_data_abs_injuries[, c("EVTYPE", "injuries")], 
+      caption = "10 events that caused the most injuries from 1995 to 2011", 
       col.names = c("EVENTS TYPE", "ABSOLUTE NUMBER OF INJURIES"))
 
 health_data_abs_fatalities <- health_data_abs %>%
-  top_n(n =10, wt=totalfatalities)
-kable(health_data_abs_fatalities[, c("EVTYPE", "totalfatalities")], 
-      caption = "10 events that caused the most fatalities from 1995 to 2007", 
+  top_n(n =10, wt=fatalities)
+kable(health_data_abs_fatalities[, c("EVTYPE", "fatalities")], 
+      caption = "10 events that caused the most fatalities from 1995 to 2011", 
       col.names = c("EVENTS TYPE", "ABSOLUTE NUMBER OF FATALITIES"))
 
 health_data_abs_total <- health_data_abs %>%
   top_n(n =10, wt=total_health_consequences)
 kable(health_data_abs_total[, c("EVTYPE", "total_health_consequences")], 
-      caption = "10 events that caused the most injuries from 1995 to 2007", 
+      caption = "10 events that caused the most injuries from 1995 to 2011", 
       col.names = c("EVENTS TYPE", "ABSOLUTE HEALTH CONSEQUENCES (FATALITIES + INJURIES)"))
 ```
 
+Again, with the 3 table of injuries, fatalities and health consequences total, but this time, on the sum of consequences in the span of 17 years (1994-2011).
 ```{r echo=TRUE}
 health_data_rel_injuries <- health_data_rel %>%
-  top_n(n =10, wt=meaninjuries)
-kable(health_data_rel_injuries[, c("EVTYPE", "meaninjuries")], 
+  top_n(n =10, wt=injuries)
+kable(health_data_rel_injuries[, c("EVTYPE", "injuries")], 
       digits = 2,
-      caption = "10 events that caused the most injuries from 1995 to 2007", 
+      caption = "10 events that caused the most injuries from 1995 to 2011", 
       col.names = c("EVENTS TYPE", "RELATIVE NUMBER OF INJURIES"))
 
 health_data_rel_fatalities <- health_data_rel %>%
-  top_n(n =10, wt=meanfatalities)
-kable(health_data_rel_fatalities[, c("EVTYPE", "meanfatalities")], 
+  top_n(n =10, wt=fatalities)
+kable(health_data_rel_fatalities[, c("EVTYPE", "fatalities")], 
       digits = 2,
-      caption = "10 events that caused the most fatalities from 1995 to 2007", 
+      caption = "10 events that caused the most fatalities from 1995 to 2011", 
       col.names = c("EVENTS TYPE", "RELATIVE NUMBER OF FATALITIES"))
 
 health_data_rel_total <- health_data_rel %>%
   top_n(n =10, wt=relative_health_consequences)
 kable(health_data_rel_total[, c("EVTYPE", "relative_health_consequences")], 
       digits = 2,
-      caption = "10 events that caused the most injuries from 1995 to 2007", 
+      caption = "10 events that caused the most injuries from 1995 to 2011", 
       col.names = c("EVENTS TYPE", "RELATIVE HEALTH CONSEQUENCES (FATALITIES + INJURIES)"))
 ```
 
+Then, modifying the table to determine discriminate in the graphic injuries and fatalities, we will plot a bar chart to give us an idea of the distribution of the consequences during the span of 17 years.
 ```{r echo=TRUE}
-health_data <- health_data_abs_total %>%
-  gather("CONSEQUENCE_TYPE", "VALUE", c("totalinjuries","totalfatalities"))
+health_data_abs <- health_data_abs_total %>%
+  gather("CONSEQUENCE_TYPE", "VALUE", c("injuries","fatalities")) %>%
+  mutate(TYPE_ANALYSIS="Absolute from 1994 to 2011") %>%
+  select(-one_of("total_health_consequences"))
+
+health_data_rel <- health_data_rel_total %>%
+  gather("CONSEQUENCE_TYPE", "VALUE", c("injuries","fatalities")) %>%
+  mutate(TYPE_ANALYSIS="Relative Per Event") %>%
+  select(-one_of("relative_health_consequences"))
+
+health_data_plot <- rbind(health_data_abs, health_data_rel)
 ```
 
-```{r echo=TRUE}
-financial_plot <- ggplot(health_data, aes(EVTYPE, y=VALUE, fill=CONSEQUENCE_TYPE))
+```{r echo=TRUE, fig.height=50, fig.width=50}
+financial_plot <- ggplot(health_data_plot, aes(EVTYPE, y=VALUE, fill=CONSEQUENCE_TYPE))
 financial_plot +  geom_bar(stat = "identity") + 
+  facet_wrap(facets = ~TYPE_ANALYSIS, scales = "free", nrow=2, ncol=1) +
+  theme(text = element_text(size=30),
+        axis.text.x = element_text(angle=90, hjust=1)) +
   ggtitle("10 top most events in relation to health") + ylab("number of occurences") + xlab("Events")
 ```
 
 ### 2- Economic consequences
+
 Than filter by variables and transform quantity of damage in dollars with the indice (k,m,b).
 ```{r echo=TRUE}
 financial_data <- data[c("year", "EVTYPE", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
@@ -144,57 +173,71 @@ financial_data <- transform(financial_data, CROPDMG = ifelse(tolower(CROPDMGEXP)
 
 ```
 
-Filter sum the data per event type and year. and get the 6 events that have the most economic consequence.
+Have two dataset, one with absolute data (the sum of crop and peroperty damages per events from 1994 to 2011) and one with the relative data (the crop and property damage per individual events from 1994 to 2011) to be able to compare the difference between two vision. 
 ```{r echo=TRUE}
 financial_data_abs <- financial_data %>%
   group_by(EVTYPE) %>%
-  summarise(totalcropdmg=sum(CROPDMG), totalpropdmg=sum(PROPDMG)) %>%
-  mutate(totaldmg=totalcropdmg+totalpropdmg)
+  summarise(cropdmg=sum(CROPDMG), propdmg=sum(PROPDMG)) %>%
+  mutate(totaldmg=cropdmg+propdmg)
 
 financial_data_rel <- financial_data %>%
   group_by(EVTYPE) %>%
-  summarise(meancropdmg=mean(CROPDMG), meanpropdmg=mean(PROPDMG)) %>%
-  mutate(totaldmg=meancropdmg+meanpropdmg)
+  summarise(cropdmg=mean(CROPDMG), propdmg=mean(PROPDMG)) %>%
+  mutate(totaldmg=cropdmg+propdmg)
 ```
 
+Have two dataset, one with absolute data (the sum of fatalites and injuries per events from 1994 to 2011) and one with the relative data (the fatalities and injuries per individual events from 1994 to 2011) to be able to compare the difference between two vision.
 ```{r echo=TRUE}
 financial_data_abs_prop <- financial_data_abs %>%
-  top_n(n =10, wt=totalpropdmg)
-kable(financial_data_abs_prop[, c("EVTYPE", "totalpropdmg")], caption = "10 events that causes the most propety damage from 1995 to 2007", col.names = c("EVENTS TYPE", "ABSOLUTE PROPERTY DAMAGES"))
+  top_n(n =10, wt=propdmg)
+kable(financial_data_abs_prop[, c("EVTYPE", "propdmg")], caption = "10 events that causes the most propety damage from 1995 to 2011", col.names = c("EVENTS TYPE", "ABSOLUTE PROPERTY DAMAGES"))
 
 financial_data_abs_crop <- financial_data_abs %>%
-  top_n(n =10, wt=totalcropdmg)
-kable(financial_data_abs_prop[, c("EVTYPE", "totalcropdmg")], caption = "10 events that causes the most crop damage from 1995 to 2007",col.names = c("EVENTS TYPE", "ABSOLUTE CROP DAMAGES"))
+  top_n(n =10, wt=cropdmg)
+kable(financial_data_abs_prop[, c("EVTYPE", "cropdmg")], caption = "10 events that causes the most crop damage from 1995 to 2011",col.names = c("EVENTS TYPE", "ABSOLUTE CROP DAMAGES"))
 
 financial_data_abs_total <- financial_data_abs %>%
   top_n(n =10, wt=totaldmg)
-kable(financial_data_abs_prop[, c("EVTYPE", "totaldmg")], caption = "10  for absolute total damage (crop + property) from 1995 to 2007", col.names = c("EVENTS TYPE", "ABSOLUTE TOTAL DAMAGES"))
+kable(financial_data_abs_prop[, c("EVTYPE", "totaldmg")], caption = "10  for absolute total damage (crop + property) from 1995 to 2011", col.names = c("EVENTS TYPE", "ABSOLUTE TOTAL DAMAGES"))
 ```
 
-
+Again, with the 3 table of crop, property and total damages, but this time, on the sum of damages in the span of 17 years (1994-2011).
 ```{r echo=TRUE}
 financial_data_rel_prop <- financial_data_rel %>%
-  top_n(n=10, wt=meanpropdmg)
-kable(financial_data_rel_prop[, c("EVTYPE", "meanpropdmg")], caption = "10 events that causes the most propety damage from 1995 to 2007", col.names = c("EVENTS TYPE", "RELATIVE PROPERTY DAMAGES"))
+  top_n(n=10, wt=propdmg)
+kable(financial_data_rel_prop[, c("EVTYPE", "propdmg")], caption = "10 events that causes the most propety damage from 1995 to 2011", col.names = c("EVENTS TYPE", "RELATIVE PROPERTY DAMAGES"))
 
 financial_data_rel_crop <- financial_data_rel %>%
-  top_n(n =10, wt=meancropdmg)
-kable(financial_data_rel_crop[, c("EVTYPE", "meancropdmg")], caption = "10 events that causes the most crop damage from 1995 to 2007",col.names = c("EVENTS TYPE", "RELATIVE CROP DAMAGES"))
+  top_n(n =10, wt=cropdmg)
+kable(financial_data_rel_crop[, c("EVTYPE", "cropdmg")], caption = "10 events that causes the most crop damage from 1995 to 2011",col.names = c("EVENTS TYPE", "RELATIVE CROP DAMAGES"))
 
 financial_data_rel_total <- financial_data_rel %>%
   top_n(n =10, wt=totaldmg)
-kable(financial_data_rel_total[, c("EVTYPE", "totaldmg")], caption = "10  for absolute total damage (crop + property) from 1995 to 2007", col.names = c("EVENTS TYPE", "RELATIVE TOTAL DAMAGES"))
+kable(financial_data_rel_total[, c("EVTYPE", "totaldmg")], caption = "10  for absolute total damage (crop + property) from 1995 to 2011", col.names = c("EVENTS TYPE", "RELATIVE TOTAL DAMAGES"))
 ```
 
+Then, modifying the table to determine discriminate in the graphic crop and property damages, we will plot a bar chart to give us an idea of the distribution of the damages during the span of 17 years.
 ```{r echo=TRUE}
-financial_data <- financial_data_abs_total %>%
-  gather("DMGTYPE", "DMGVALUE", c("totalpropdmg","totalcropdmg"))
+financial_data_abs <- financial_data_abs_total %>%
+  gather("DMG_TYPE", "VALUE", c("cropdmg","propdmg")) %>%
+  mutate(TYPE_ANALYSIS="Absolute from 1994 to 2011") %>%
+  select(-one_of("totaldmg"))
+
+financial_data_rel <- financial_data_rel_total %>%
+  gather("DMG_TYPE", "VALUE", c("cropdmg","propdmg")) %>%
+  mutate(TYPE_ANALYSIS="Relative Per Event") %>%
+  select(-one_of("totaldmg"))
+
+financial_data_plot <- rbind(financial_data_abs, financial_data_rel)
 ```
 
 Plot a graphic of the economic consequences.
-```{r echot=TRUE, fig.height=500, fig.width=500}
-financial_plot <- ggplot(financial_data, aes(EVTYPE, y=DMGVALUE, fill=DMGTYPE))
+```{r echot=TRUE, fig.height=50, fig.width=50}
+financial_plot <- ggplot(financial_data_plot, aes(EVTYPE, y=VALUE, fill=DMG_TYPE))
 financial_plot +  geom_bar(stat = "identity") + 
+    facet_wrap(facets = ~TYPE_ANALYSIS, scales = "free", nrow=2, ncol=1) +
+    theme(text = element_text(size=30),
+        axis.text.x = element_text(angle=90, hjust=1)) +
   ggtitle("6 top most financial eavy events") + ylab("dommage in dollars") + xlab("Events")
 ```
 
@@ -202,11 +245,5 @@ financial_plot +  geom_bar(stat = "identity") +
 
 You can also embed plots, for example:
 
-```{r pressure, echo=TRUE}
-#library("ggplot2")
-#stepsPerDayPlot <- ggplot(data = financial_data, aes(EVTYPE,PROPDMG+CROPDMG))
-#  stepsPerDayPlot + geom_histogram(binwidth = 5000,colour="darkgreen", fill="lightgreen",alpha=0.4) +
-#                    ggtitle("Distribution of steps per day") + ylab("Frequency") + xlab("Total steps")
-```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

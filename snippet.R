@@ -1,14 +1,17 @@
 ########################################################################
 # Script to dabble with data exploration before playoing with knitr.
 ########################################################################
-library(dplyr)
+library(knitr)
 library(ggplot2)
 library(tidyr)
+library(dplyr)
 
+# load data
 if(!dir.exists("data")) {
   dir.create("data")
   download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "data/dataset.csv.bz2")
-} 
+}
+data <- read.csv2("data/dataset.csv.bz2", sep = ",")
 
 if(!exists("data_init")) {
   data_init <- read.csv2("data/dataset.csv.bz2", sep = ",")
@@ -27,33 +30,58 @@ minyear <- min(findBreakingPoint[findBreakingPoint$count > mean(findBreakingPoin
 
 data <- subset(data, minyear <= year)
 
-finvars <- names(data) %in% c("year", "EVTYPE", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
-financial_data <- data[finvars]
-financial_data$CROPDMG <- as.numeric(as.character(financial_data$CROPDMG))
-financial_data$PROPDMG <- as.numeric(as.character(financial_data$PROPDMG))
-financial_data <- transform(financial_data, PROPDMG = ifelse(tolower(PROPDMGEXP) == "k", PROPDMG * 1e3, 
-                                                             ifelse(tolower(PROPDMGEXP) == "m", PROPDMG * 1e6, 
-                                                                    ifelse(tolower(PROPDMGEXP) == "b", PROPDMG * 1e9, PROPDMG))))
-financial_data <- transform(financial_data, CROPDMG = ifelse(tolower(CROPDMGEXP) == "k", CROPDMG * 1e3, 
-                                                             ifelse(tolower(CROPDMGEXP) == "m", CROPDMG * 1e6, 
-                                                                    ifelse(tolower(CROPDMGEXP) == "b", CROPDMG * 1e9, CROPDMG))))
-
-financial_data <- financial_data %>%
-  group_by(year, EVTYPE) %>%
-  summarise(totalcropdmg=sum(CROPDMG), totalpropdmg=sum(PROPDMG))
-  
-financial_data <- financial_data %>%
+eventType_count <- data[c("EVTYPE")]
+eventType_count$EVTYPE <- as.character(eventType_count$EVTYPE)
+eventType_count <- eventType_count %>%
   group_by(EVTYPE) %>%
-  summarise(totalcropdmg=sum(totalcropdmg), totalpropdmg=sum(totalpropdmg)) %>%
-  mutate(totaldmg=totalcropdmg+totalpropdmg) %>%
-  top_n(n = 6, wt=totaldmg)
+  summarise(count=n()) %>%
+  top_n(n = 20, wt=count)
 
-library(tidyr)
-financial_data <- financial_data %>%
-  gather("DMGTYPE", "DMGVALUE", c("totalpropdmg","totalcropdmg"))
+health_data <- data[c("year", "EVTYPE", "INJURIES", "FATALITIES")]
+health_data$INJURIES <- as.numeric(as.character(health_data$INJURIES))
+health_data$FATALITIES <- as.numeric(as.character(health_data$FATALITIES))
 
-financial_plot <- ggplot(financial_data, aes(EVTYPE))
-financial_plot +  geom_bar(aes(y=totalpropdmg), color="darkgreen", fill="green", alpha=0.4, stat="identity") + 
-  geom_bar(aes(y = totalcropdmg), colour = "darkred", fill="red", alpha=0.4, stat = "identity") +
-  ggtitle("6 top most financial eavy events") + ylab("dommage in dollars") + xlab("Events")
+health_data_abs <- health_data %>%
+  group_by(EVTYPE) %>%
+  summarise(injuries=sum(INJURIES), fatalities=sum(FATALITIES)) %>%
+  mutate(total_health_consequences=injuries + fatalities)
 
+health_data_rel <- health_data %>%
+  group_by(EVTYPE) %>%
+  summarise(injuries=mean(INJURIES), fatalities=mean(FATALITIES)) %>%
+  mutate(relative_health_consequences=injuries + fatalities)
+
+health_data_abs_injuries <- health_data_abs %>%
+  top_n(n =10, wt=injuries)
+
+health_data_abs_fatalities <- health_data_abs %>%
+  top_n(n =10, wt=fatalities)
+
+health_data_abs_total <- health_data_abs %>%
+  top_n(n =10, wt=total_health_consequences)
+
+health_data_rel_injuries <- health_data_rel %>%
+  top_n(n =10, wt=injuries)
+
+health_data_rel_fatalities <- health_data_rel %>%
+  top_n(n =10, wt=fatalities)
+
+health_data_rel_total <- health_data_rel %>%
+  top_n(n =10, wt=relative_health_consequences)
+
+health_data_abs <- health_data_abs_total %>%
+  gather("CONSEQUENCE_TYPE", "VALUE", c("injuries","fatalities")) %>%
+  mutate(TYPE_ANALYSIS="Absolute from 1994 to 2011") %>%
+  select(-one_of("total_health_consequences"))
+
+health_data_rel <- health_data_rel_total %>%
+  gather("CONSEQUENCE_TYPE", "VALUE", c("injuries","fatalities")) %>%
+  mutate(TYPE_ANALYSIS="Relative Per Event") %>%
+  select(-one_of("relative_health_consequences"))
+
+health_data_plot <- rbind(health_data_abs, health_data_rel)
+
+financial_plot <- ggplot(health_data_plot, aes(EVTYPE, y=VALUE, fill=CONSEQUENCE_TYPE))
+financial_plot +  geom_bar(stat = "identity") + 
+  geom_bar(stat = "identity") + facet_wrap(facets = ~TYPE_ANALYSIS, scales = "free", nrow=2, ncol=1) +
+ggtitle("10 top most events in relation to health") + ylab("number of occurences") + xlab("Events")
