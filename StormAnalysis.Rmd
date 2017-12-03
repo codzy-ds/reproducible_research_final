@@ -1,10 +1,10 @@
 ---
 title: "Health and financial analysis of weather events"
 author: "Michel Bernier"
-date: "October 10, 2017"
+date: "November 27, 2017"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ## Synopsis
@@ -18,7 +18,7 @@ For both analysis (health and financial), we will need to know the mean of conse
 ## Data Processing
 
 First, load the libraries we will need during the analysis. Loading them at the begining of the document ensure that we don't load them more times than needs be and the we have them available when they are needed.
-```{r echo=TRUE, warning=FALSE}
+```{r echo=TRUE, warning=FALSE, message=FALSE}
 library(knitr)
 library(ggplot2)
 library(tidyr)
@@ -52,7 +52,8 @@ data <- subset(data, minyear <= year)
 
 ## Count events
 
-get the top 20 events that happened the most often between 1994 and 2011.
+Get the top 20 events that happened the most often between 1994 and 2011.
+This table can gives us some insight as to why some events have more consequences as a whole.
 ```{r echo=TRUE}
 eventType_count <- data[c("EVTYPE")]
 eventType_count$EVTYPE <- as.character(eventType_count$EVTYPE)
@@ -63,8 +64,9 @@ eventType_count <- eventType_count %>%
 
 kable(eventType_count[, c("EVTYPE", "count")], 
       caption = "20 events that happened most often from 1995 to 2011", 
-      col.names = c("EVENTS TYPE", "ABSOLUTE NUMBER OF FATALITIES"))
+      col.names = c("EVENTS TYPE", "NUMBER OF EVENTS"))
 ```
+This table doesn't say if an event as a lot of consequences, but can explain why som events have more consequences (per individual events).
 
 ### 1- Health consequences
 
@@ -88,52 +90,58 @@ health_data_rel <- health_data %>%
   mutate(relative_health_consequences=injuries + fatalities)
 ```
 
-By creating 3 table, getting the top 10 events relative to injuries, fatalities and health consequences total, we will be able to determine what event has the most consequences per individual event.
+
+### Absolute health consequences
+By creating 3 table, getting the top 10 events relative to injuries, fatalities and health consequences total, we will be able to determine what event has the most consequences on the sum of consequences in the span of 17 years (1994-2011).
 ```{r echo=TRUE}
 health_data_abs_injuries <- health_data_abs %>%
   top_n(n =10, wt=injuries)
 kable(health_data_abs_injuries[, c("EVTYPE", "injuries")], 
-      caption = "10 events that caused the most injuries from 1995 to 2011", 
+      caption = "10 events that caused the most injuries from 1994 to 2011", 
       col.names = c("EVENTS TYPE", "ABSOLUTE NUMBER OF INJURIES"))
 
 health_data_abs_fatalities <- health_data_abs %>%
   top_n(n =10, wt=fatalities)
 kable(health_data_abs_fatalities[, c("EVTYPE", "fatalities")], 
-      caption = "10 events that caused the most fatalities from 1995 to 2011", 
+      caption = "10 events that caused the most fatalities from 1994 to 2011", 
       col.names = c("EVENTS TYPE", "ABSOLUTE NUMBER OF FATALITIES"))
 
 health_data_abs_total <- health_data_abs %>%
   top_n(n =10, wt=total_health_consequences)
 kable(health_data_abs_total[, c("EVTYPE", "total_health_consequences")], 
-      caption = "10 events that caused the most injuries from 1995 to 2011", 
+      caption = "10 events that caused the most injuries from 1994 to 2011", 
       col.names = c("EVENTS TYPE", "ABSOLUTE HEALTH CONSEQUENCES (FATALITIES + INJURIES)"))
 ```
+We can see that the number of injuries is a lot higher than the number of fatalities, by a high margin. And from 1994 to 2011, tornado has a lot more cumulative consequenses.
 
-Again, with the 3 table of injuries, fatalities and health consequences total, but this time, on the sum of consequences in the span of 17 years (1994-2011).
+#### Relative health consequences
+Again, with the 3 table of injuries, fatalities and health consequences total, but this time, per individual event.
 ```{r echo=TRUE}
 health_data_rel_injuries <- health_data_rel %>%
   top_n(n =10, wt=injuries)
 kable(health_data_rel_injuries[, c("EVTYPE", "injuries")], 
       digits = 2,
-      caption = "10 events that caused the most injuries from 1995 to 2011", 
+      caption = "10 events that caused the most injuries from 1994 to 2011", 
       col.names = c("EVENTS TYPE", "RELATIVE NUMBER OF INJURIES"))
 
 health_data_rel_fatalities <- health_data_rel %>%
   top_n(n =10, wt=fatalities)
 kable(health_data_rel_fatalities[, c("EVTYPE", "fatalities")], 
       digits = 2,
-      caption = "10 events that caused the most fatalities from 1995 to 2011", 
+      caption = "10 events that caused the most fatalities from 1994 to 2011", 
       col.names = c("EVENTS TYPE", "RELATIVE NUMBER OF FATALITIES"))
 
 health_data_rel_total <- health_data_rel %>%
   top_n(n =10, wt=relative_health_consequences)
 kable(health_data_rel_total[, c("EVTYPE", "relative_health_consequences")], 
       digits = 2,
-      caption = "10 events that caused the most injuries from 1995 to 2011", 
+      caption = "10 events that caused the most injuries from 1994 to 2011", 
       col.names = c("EVENTS TYPE", "RELATIVE HEALTH CONSEQUENCES (FATALITIES + INJURIES)"))
 ```
+Again, the number of injuries per events is a lot more decisive. but we can see that per event, heat waves have more consequences on health than anything else.
 
-Then, modifying the table to determine discriminate in the graphic injuries and fatalities, we will plot a bar chart to give us an idea of the distribution of the consequences during the span of 17 years.
+#### Visualization of data.
+Then, modifying the table to determine discriminate in the graphic injuries and fatalities, we will plot a bar chart faceted to visualize which events have more consequences.
 ```{r echo=TRUE}
 health_data_abs <- health_data_abs_total %>%
   gather("CONSEQUENCE_TYPE", "VALUE", c("injuries","fatalities")) %>%
@@ -148,18 +156,19 @@ health_data_rel <- health_data_rel_total %>%
 health_data_plot <- rbind(health_data_abs, health_data_rel)
 ```
 
-```{r echo=TRUE, fig.height=50, fig.width=50}
+```{r echo=TRUE, fig.height=50, fig.width=50, fig.cap="relative and absolute health consequences"}
 financial_plot <- ggplot(health_data_plot, aes(EVTYPE, y=VALUE, fill=CONSEQUENCE_TYPE))
 financial_plot +  geom_bar(stat = "identity") + 
   facet_wrap(facets = ~TYPE_ANALYSIS, scales = "free", nrow=2, ncol=1) +
-  theme(text = element_text(size=30),
+  theme(text = element_text(size=50),legend.text=element_text(size=50), 
+        plot.title = element_text(size=50),
         axis.text.x = element_text(angle=90, hjust=1)) +
   ggtitle("10 top most events in relation to health") + ylab("number of occurences") + xlab("Events")
 ```
 
 ### 2- Economic consequences
 
-Than filter by variables and transform quantity of damage in dollars with the indice (k,m,b).
+Filter by variables and transform quantity of damage in dollars with the indice (k,m,b).
 ```{r echo=TRUE}
 financial_data <- data[c("year", "EVTYPE", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
 financial_data$CROPDMG <- as.numeric(as.character(financial_data$CROPDMG))
@@ -186,48 +195,53 @@ financial_data_rel <- financial_data %>%
   mutate(totaldmg=cropdmg+propdmg)
 ```
 
-Have two dataset, one with absolute data (the sum of fatalites and injuries per events from 1994 to 2011) and one with the relative data (the fatalities and injuries per individual events from 1994 to 2011) to be able to compare the difference between two vision.
+### Absolute damage
+By creating 3 table, getting the top 10 events relative to crop, property and total damage, we will be able to determine what event has the most consequences in the span of 17 years (1994-2011).
 ```{r echo=TRUE}
 financial_data_abs_prop <- financial_data_abs %>%
   top_n(n =10, wt=propdmg)
 kable(financial_data_abs_prop[, c("EVTYPE", "propdmg")], 
-      caption = "10 events that causes the most propety damage from 1995 to 2011", 
+      caption = "10 events that causes the most propety damage from 1994 to 2011", 
       col.names = c("EVENTS TYPE", "ABSOLUTE PROPERTY DAMAGES"))
 
 financial_data_abs_crop <- financial_data_abs %>%
   top_n(n =10, wt=cropdmg)
 kable(financial_data_abs_prop[, c("EVTYPE", "cropdmg")], 
-      caption = "10 events that causes the most crop damage from 1995 to 2011",
+      caption = "10 events that causes the most crop damage from 1994 to 2011",
       col.names = c("EVENTS TYPE", "ABSOLUTE CROP DAMAGES"))
 
 financial_data_abs_total <- financial_data_abs %>%
   top_n(n =10, wt=totaldmg)
 kable(financial_data_abs_prop[, c("EVTYPE", "totaldmg")], 
-      caption = "10  for absolute total damage (crop + property) from 1995 to 2011", 
+      caption = "10  for absolute total damage (crop + property) from 1994 to 2011", 
       col.names = c("EVENTS TYPE", "ABSOLUTE TOTAL DAMAGES"))
 ```
+Even if property damage is the discriminent, event for crop damage, flood is the event that did the most damage over the 17 years we analyzed.
 
-Again, with the 3 table of crop, property and total damages, but this time, on the sum of damages in the span of 17 years (1994-2011).
+#### Relative damage
+Again, with the 3 table of crop, property and total damages, but this time, on the sum of damages per events.
 ```{r echo=TRUE}
 financial_data_rel_prop <- financial_data_rel %>%
   top_n(n=10, wt=propdmg)
 kable(financial_data_rel_prop[, c("EVTYPE", "propdmg")], 
-      caption = "10 events that causes the most propety damage from 1995 to 2011", 
+      caption = "10 events that causes the most propety damage from 1994 to 2011", 
       col.names = c("EVENTS TYPE", "RELATIVE PROPERTY DAMAGES"))
 
 financial_data_rel_crop <- financial_data_rel %>%
   top_n(n =10, wt=cropdmg)
 kable(financial_data_rel_crop[, c("EVTYPE", "cropdmg")], 
-      caption = "10 events that causes the most crop damage from 1995 to 2011",
+      caption = "10 events that causes the most crop damage from 1994 to 2011",
       col.names = c("EVENTS TYPE", "RELATIVE CROP DAMAGES"))
 
 financial_data_rel_total <- financial_data_rel %>%
   top_n(n =10, wt=totaldmg)
 kable(financial_data_rel_total[, c("EVTYPE", "totaldmg")], 
-      caption = "10  for absolute total damage (crop + property) from 1995 to 2011", 
+      caption = "10  for absolute total damage (crop + property) from 1994 to 2011", 
       col.names = c("EVENTS TYPE", "RELATIVE TOTAL DAMAGES"))
 ```
+Per events, Heavy rain does the most damage.
 
+#### Visualization of damage
 Then, modifying the table to determine discriminate in the graphic crop and property damages, we will plot a bar chart to give us an idea of the distribution of the damages during the span of 17 years.
 ```{r echo=TRUE}
 financial_data_abs <- financial_data_abs_total %>%
@@ -244,15 +258,22 @@ financial_data_plot <- rbind(financial_data_abs, financial_data_rel)
 ```
 
 Plot a graphic of the economic consequences.
-```{r echot=TRUE, fig.height=50, fig.width=50}
+```{r echot=TRUE, fig.height=50, fig.width=50, fig.cap="relative and absolute financial consequences"}
 financial_plot <- ggplot(financial_data_plot, aes(EVTYPE, y=VALUE, fill=DMG_TYPE))
 financial_plot +  geom_bar(stat = "identity") + 
     facet_wrap(facets = ~TYPE_ANALYSIS, scales = "free", nrow=2, ncol=1) +
-    theme(text = element_text(size=30),
+    theme(text = element_text(size=50),legend.text=element_text(size=50),
+          plot.title = element_text(size=50),
         axis.text.x = element_text(angle=90, hjust=1)) +
   ggtitle("6 top most financial eavy events") + ylab("dommage in dollars") + xlab("Events")
 ```
 
 ## Results
 
+### 1- Health consequences
+ 
+The event that have the most consequence on health would be tornado. Per events heat wave has more injuries, but we can see in the top 20 number of events table that tornado appears, but not heat waves. Which tells us that the event does not happen realy often.
 
+### 2- Damage consequences
+
+Again, flood has the most consequence over the time of the study. Heavy rain has more consequences per events, but happens less often. That is why flood has, on a whole, more consequences.
